@@ -21,7 +21,7 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 SEED = 42
 np.random.seed(SEED)
-DATA_URL = "https://raw.githubusercontent.com/selva86/datasets/master/student-mat.csv"
+DATA_URL = "student-mat.csv"
 
 @st.cache_data if False else lambda f: f
 def load_data():
