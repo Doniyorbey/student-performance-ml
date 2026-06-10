@@ -1,4 +1,4 @@
-import os, warnings, joblib
+import warnings
 warnings.filterwarnings("ignore")
 import numpy as np
 import pandas as pd
@@ -13,24 +13,16 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import (accuracy_score, precision_score, recall_score,
-                              f1_score, roc_auc_score, roc_curve,
-                              confusion_matrix)
+                              f1_score, roc_auc_score, roc_curve, confusion_matrix)
 from scipy.stats import wilcoxon
-import optuna
-optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 SEED = 42
 np.random.seed(SEED)
-DATA_URL = "student-mat.csv"
 
-@st.cache_data if False else lambda f: f
 def load_data():
-   try:
-    df = pd.read_csv(DATA_URL, sep=";")
+    df = pd.read_csv("student-mat.csv", sep=";")
     if "G3" not in df.columns:
-        df = pd.read_csv(DATA_URL, sep=",")
-except:
-    df = pd.read_csv(DATA_URL, sep=",")
+        df = pd.read_csv("student-mat.csv", sep=",")
     df["target"]         = (df["G3"] >= 10).astype(int)
     df["risk_index"]     = df["studytime"] * df["failures"]
     df["absence_rate"]   = df["absences"] / (df["age"] + 1)
@@ -60,10 +52,12 @@ def get_models():
             {"clf__max_depth": [3, 5, 7, None], "clf__min_samples_leaf": [1, 5, 10]}),
         "Random Forest": (
             RandomForestClassifier(class_weight="balanced", random_state=SEED, n_jobs=-1),
-            {"clf__n_estimators": [100, 200], "clf__max_depth": [5, 10, None], "clf__max_features": ["sqrt", "log2"]}),
+            {"clf__n_estimators": [100, 200], "clf__max_depth": [5, 10, None],
+             "clf__max_features": ["sqrt", "log2"]}),
         "Gradient Boosting": (
             GradientBoostingClassifier(random_state=SEED),
-            {"clf__n_estimators": [100, 200], "clf__learning_rate": [0.05, 0.1, 0.2], "clf__max_depth": [3, 5]}),
+            {"clf__n_estimators": [100, 200], "clf__learning_rate": [0.05, 0.1, 0.2],
+             "clf__max_depth": [3, 5]}),
         "SVM RBF": (
             SVC(kernel="rbf", class_weight="balanced", probability=True, random_state=SEED),
             {"clf__C": [0.1, 1, 10, 100], "clf__gamma": ["scale", 0.001, 0.01]}),
@@ -73,12 +67,12 @@ def get_models():
     }
 
 def train_models(X, y, preprocessor):
-    models     = get_models()
-    outer_cv   = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
-    inner_cv   = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
-    results    = {}
-    f1_arrays  = {}
-    best_pipes = {}
+    models    = get_models()
+    outer_cv  = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
+    inner_cv  = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
+    results   = {}
+    f1_arrays = {}
+    best_pipes= {}
 
     for name, (estimator, param_grid) in models.items():
         pipe = Pipeline([("pre", preprocessor), ("clf", estimator)])
@@ -100,15 +94,13 @@ def train_models(X, y, preprocessor):
             auc_s.append(roc_auc_score(y_test, ya))
 
         results[name] = {
-            "Accuracy":  (np.mean(acc_s),  np.std(acc_s)),
-            "Precision": (np.mean(pre_s),  np.std(pre_s)),
-            "Recall":    (np.mean(rec_s),  np.std(rec_s)),
-            "F1":        (np.mean(f1_s),   np.std(f1_s)),
-            "AUC-ROC":   (np.mean(auc_s),  np.std(auc_s)),
+            "Accuracy":  (np.mean(acc_s), np.std(acc_s)),
+            "Precision": (np.mean(pre_s), np.std(pre_s)),
+            "Recall":    (np.mean(rec_s), np.std(rec_s)),
+            "F1":        (np.mean(f1_s),  np.std(f1_s)),
+            "AUC-ROC":   (np.mean(auc_s), np.std(auc_s)),
         }
         f1_arrays[name] = f1_s
-
-        # Best model full fit
         gs_full = GridSearchCV(pipe, param_grid, cv=inner_cv,
                                scoring="f1", n_jobs=-1, refit=True)
         gs_full.fit(X, y)
