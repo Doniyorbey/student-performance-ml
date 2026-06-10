@@ -25,7 +25,12 @@ DATA_URL = "student-mat.csv"
 
 @st.cache_data if False else lambda f: f
 def load_data():
+   try:
     df = pd.read_csv(DATA_URL, sep=";")
+    if "G3" not in df.columns:
+        df = pd.read_csv(DATA_URL, sep=",")
+except:
+    df = pd.read_csv(DATA_URL, sep=",")
     df["target"]         = (df["G3"] >= 10).astype(int)
     df["risk_index"]     = df["studytime"] * df["failures"]
     df["absence_rate"]   = df["absences"] / (df["age"] + 1)
